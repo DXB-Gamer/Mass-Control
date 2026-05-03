@@ -56,21 +56,6 @@
         .dl { color: #00ff8888; }
         .dv { color: #00ffff; font-weight: bold; }
         
-        #level-panel {
-            position: absolute; top: 20px; left: 50%;
-            transform: translateX(-50%);
-            background: rgba(0, 30, 60, 0.92); color: #00ffff;
-            border: 2px solid #00ffff66; padding: 14px 24px;
-            pointer-events: none; z-index: 100;
-            font-size: 13px; text-align: center; font-family: monospace;
-            backdrop-filter: blur(8px);
-            box-shadow: 0 0 20px rgba(0, 255, 255, 0.1);
-            border-radius: 4px;
-        }
-        #level-panel h3 { margin: 0 0 8px 0; letter-spacing: 3px; font-size: 14px; color: #00ffff; }
-        #objective { color: #ffff00; margin: 6px 0; font-size: 11px; font-weight: bold; text-shadow: 0 0 8px rgba(255,255,0,0.5); }
-        #progress { color: #00ff88; font-size: 10px; margin-top: 4px; }
-        
         #rank-panel {
             position: absolute; bottom: 20px; left: 20px;
             color: #00ff00; font-family: monospace;
@@ -110,33 +95,7 @@
         }
         #hold-indicator.visible { opacity: 1; }
         
-        /* ─── LEVEL COMPLETE ─── */
-        #level-complete {
-            position: absolute; top: 50%; left: 50%;
-            transform: translate(-50%, -50%);
-            background: rgba(0, 10, 30, 0.98); color: #00ff00;
-            border: 3px solid #00ff00; padding: 36px 48px;
-            text-align: center; z-index: 200;
-            pointer-events: auto; display: none;
-            box-shadow: 0 0 60px rgba(0, 255, 0, 0.3), inset 0 0 30px rgba(0, 255, 0, 0.05);
-            font-family: monospace;
-            border-radius: 6px;
-        }
-        #level-complete h2 { margin: 0 0 14px; font-size: 32px; letter-spacing: 4px; text-shadow: 0 0 20px #00ff00; }
-        #level-complete p { font-size: 13px; margin: 10px 0; color: #00ff88; }
-        #level-complete button {
-            background: rgba(0, 255, 0, 0.1); color: #00ff00; border: 2px solid #00ff00;
-            padding: 12px 28px; margin: 10px 8px; cursor: pointer;
-            font-weight: bold; font-size: 12px; font-family: monospace;
-            letter-spacing: 2px; transition: all 0.2s;
-            border-radius: 4px;
-        }
-        #level-complete button:hover { 
-            background: #00ff00; 
-            color: #000; 
-            box-shadow: 0 0 20px #00ff00;
-            transform: scale(1.05);
-        }
+        /* level-complete removed */
         
         /* ─── EDITOR PANEL ─── */
         #editor-panel {
@@ -209,9 +168,31 @@
         #editor-panel::-webkit-scrollbar-thumb:hover {
             background: rgba(0, 255, 0, 0.5);
         }
+        .color-swatch {
+            width: 24px; height: 24px; border-radius: 4px;
+            cursor: pointer; border: 2px solid transparent;
+            transition: border-color 0.15s, transform 0.15s;
+        }
+        .color-swatch:hover { transform: scale(1.2); }
+        .color-swatch.active { border-color: #fff; box-shadow: 0 0 8px rgba(255,255,255,0.6); }
+        .gun-skin-btn {
+            background: rgba(0,255,0,0.08) !important;
+            transition: all 0.15s !important;
+        }
+        .gun-skin-btn.active {
+            background: rgba(0,255,0,0.25) !important;
+            border-color: #00ff00 !important;
+        }
     </style>
 </head>
 <body>
+
+    <!-- 3D HAND + GUN VIEWMODEL -->
+    <canvas id="viewmodel-canvas" style="
+        position:fixed; bottom:0; right:0;
+        width:520px; height:380px;
+        pointer-events:none; z-index:20;
+    "></canvas>
 
     <div id="crosshair"></div>
     <div id="crosshair-dot"></div>
@@ -225,29 +206,15 @@
     </div>
 
     <div id="rank-panel">
-        <div>RANK: <span id="rank">TRAINEE</span></div>
-        <div>SCORE: <span id="score">0</span></div>
-        <div>LEVEL: <span id="current-level">1</span>/6</div>
-        <div>TIME: <span id="timer">0s</span></div>
-    </div>
-
-    <div id="level-panel">
-        <h3>LEVEL <span id="level-number">1</span></h3>
-        <div id="objective">Loading...</div>
-        <div id="progress">Progress: 0/1</div>
+        <div>OBJECTS: <span id="obj-count-hud">0</span></div>
+        <div>HELD: <span id="held-hud">—</span></div>
     </div>
 
     <div id="ui">
         WASD MOVE &nbsp;|&nbsp; E EDITOR &nbsp;|&nbsp; CLICK GRAB &nbsp;|&nbsp; RELEASE THROW &nbsp;|&nbsp; SCROLL DISTANCE
     </div>
 
-    <div id="level-complete">
-        <h2>LEVEL COMPLETE</h2>
-        <p id="completion-text">Well done!</p>
-        <p>Score: <span id="final-score">0</span> &nbsp;|&nbsp; Time: <span id="final-time">0s</span></p>
-        <button id="next-level">NEXT LEVEL →</button>
-        <button id="retry-level">↺ RETRY</button>
-    </div>
+
 
     <div id="editor-panel" style="display:none;">
         <h3>⚙ EDITOR MODE</h3>
@@ -258,6 +225,23 @@
             <button id="add-large-box">+ LARGE BOX (2×2)</button>
             <button id="add-sphere">+ SPHERE</button>
             <button id="add-cylinder">+ CYLINDER</button>
+            <button id="add-cone">+ CONE</button>
+            <button id="add-torus">+ TORUS RING</button>
+        </div>
+
+        <div class="editor-section">
+            <div class="section-title">Object Color</div>
+            <div style="display:flex; gap:6px; flex-wrap:wrap; margin-bottom:6px;">
+                <div class="color-swatch" data-color="#00aaff" style="background:#00aaff;"></div>
+                <div class="color-swatch" data-color="#ff5555" style="background:#ff5555;"></div>
+                <div class="color-swatch" data-color="#55ff88" style="background:#55ff88;"></div>
+                <div class="color-swatch" data-color="#ffaa00" style="background:#ffaa00;"></div>
+                <div class="color-swatch" data-color="#aa55ff" style="background:#aa55ff;"></div>
+                <div class="color-swatch" data-color="#ff55bb" style="background:#ff55bb;"></div>
+                <div class="color-swatch" data-color="#ffffff" style="background:#ffffff;"></div>
+                <div class="color-swatch" data-color="#ff3300" style="background:#ff3300;"></div>
+            </div>
+            <label>Custom: <input type="color" id="custom-color" value="#00aaff" style="width:100%;height:28px;border:none;border-radius:3px;cursor:pointer;background:none;padding:0;"></label>
         </div>
 
         <div class="editor-section">
@@ -266,6 +250,20 @@
             <input type="range" id="gravity-slider" min="0" max="50" step="0.1" value="9.8">
             <label>SPAWN MASS: <span id="mass-value">1.0</span>kg</label>
             <input type="range" id="mass-slider" min="0.1" max="10" step="0.1" value="1">
+            <label>THROW FORCE: <span id="throw-value">22</span></label>
+            <input type="range" id="throw-slider" min="5" max="60" step="1" value="22">
+            <label>BOUNCINESS: <span id="bounce-value">0.35</span></label>
+            <input type="range" id="bounce-slider" min="0" max="1" step="0.05" value="0.35">
+        </div>
+
+        <div class="editor-section">
+            <div class="section-title">Gun Skin</div>
+            <div style="display:flex;gap:4px;flex-wrap:wrap;">
+                <button class="gun-skin-btn" data-skin="default" style="width:48%;font-size:9px;">⬛ TACTICAL</button>
+                <button class="gun-skin-btn" data-skin="gold" style="width:48%;font-size:9px;">🟡 GOLD</button>
+                <button class="gun-skin-btn" data-skin="chrome" style="width:48%;font-size:9px;">⬜ CHROME</button>
+                <button class="gun-skin-btn" data-skin="red" style="width:48%;font-size:9px;">🔴 RED OPS</button>
+            </div>
         </div>
 
         <div class="editor-section">
@@ -273,6 +271,7 @@
             <button id="delete-last">⌫ DELETE LAST</button>
             <button id="clear-all">✕ CLEAR ALL</button>
             <button id="reset-level">↺ RESET LEVEL</button>
+            <button id="explode-all" style="color:#ff5555;border-color:#ff555566;">💥 EXPLODE ALL</button>
         </div>
 
         <div id="object-count" style="color:#00ff8888; margin-top:12px; font-size:11px; text-align:center; letter-spacing:1px; border-top:1px solid #00ff0022; padding-top:10px;">OBJECTS: 0</div>
@@ -292,22 +291,6 @@
         import * as THREE from 'three';
         import * as CANNON from 'cannon-es';
         import { PointerLockControls } from 'three/addons/controls/PointerLockControls.js';
-
-        // ─── GAME STATE ───────────────────────────────────────────
-        let currentLevel = 1;
-        let totalScore = 0;
-        let levelStartTime = 0;
-        let pickedUpCount = 0;
-        const ranks = ["TRAINEE", "CADET", "AGENT", "MASTER", "ELITE", "LEGEND"];
-
-        const levels = [
-            { name: "First Contact",   objective: "Hold down CLICK to grab the box",                count: 1, gravity: 9.8, reward: 100, description: "Pick up and hold a box" },
-            { name: "Double Hold",     objective: "Grab and hold 2 objects",                        count: 2, gravity: 9.8, reward: 200, description: "Hold 2 objects at once" },
-            { name: "Stack & Hold",    objective: "Pick up 3 boxes",                                count: 3, gravity: 8,   reward: 300, description: "Grab all 3 boxes" },
-            { name: "Bounce Catch",    objective: "Catch the bouncing sphere",                      count: 1, gravity: 6,   reward: 400, description: "Hold a bouncing sphere" },
-            { name: "Heavy Metal",     objective: "Hold 2 heavy boxes in low gravity",              count: 2, gravity: 3,   reward: 500, description: "Low-g heavy objects" },
-            { name: "Master Juggler",  objective: "Hold 3 objects in sequence",                    count: 3, gravity: 5,   reward: 1000, description: "Hold 3 objects at once" }
-        ];
 
         // ─── PHYSICS WORLD ────────────────────────────────────────
         const world = new CANNON.World();
@@ -329,6 +312,10 @@
         renderer.shadowMap.enabled = true;
         renderer.shadowMap.type = THREE.PCFSoftShadowMap;
         renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
+        renderer.domElement.style.position = 'absolute';
+        renderer.domElement.style.top = '0';
+        renderer.domElement.style.left = '0';
+        renderer.domElement.style.zIndex = '1';
         document.body.appendChild(renderer.domElement);
 
         // Lights
@@ -425,63 +412,31 @@
         }
 
         // ─── LEVEL LOADING ────────────────────────────────────────
-        function loadLevel(num) {
-            currentLevel = num;
-            pickedUpCount = 0;
-            levelStartTime = Date.now();
-            releaseObject(); // drop anything held
-
+        function resetScene() {
+            releaseObject();
             for (let i = meshes.length - 1; i >= 0; i--) {
                 scene.remove(meshes[i]);
                 world.removeBody(bodies[i]);
             }
             meshes.length = 0;
             bodies.length = 0;
-
-            const lv = levels[num - 1];
-            world.gravity.y = -lv.gravity;
-
+            // Spawn a handful of starter objects
             const cols = [0x00aaff, 0xff5544, 0x44ffaa, 0xffcc00, 0xaa44ff];
-            for (let i = 0; i < lv.count; i++) {
-                const isLv4 = num === 4;
-                const isSphere = isLv4 || (num === 6 && i === 0);
-                let pos;
-                if (lv.count === 1)      pos = new THREE.Vector3(0, 2, -6);
-                else if (lv.count === 2) pos = new THREE.Vector3((i - 0.5) * 4, 2, -6);
-                else                     pos = new THREE.Vector3((i - 1) * 3, 2 + i * 0.3, -5 - i * 0.5);
-
-                if (isSphere) {
-                    addDynamicObject(new THREE.SphereGeometry(0.55, 32, 32), pos, 1, cols[i]);
-                } else {
-                    const sz = num === 5 ? 1.4 : 1;
-                    addDynamicObject(new THREE.BoxGeometry(sz, sz, sz), pos, num === 5 ? 5 : 1, cols[i]);
-                }
+            for (let i = 0; i < 5; i++) {
+                const pos = new THREE.Vector3((i - 2) * 2.5, 3, -6);
+                const pick = i % 3;
+                if (pick === 0) addDynamicObject(new THREE.BoxGeometry(1,1,1), pos, 1, cols[i]);
+                else if (pick === 1) addDynamicObject(new THREE.SphereGeometry(0.55, 16, 16), pos, 1, cols[i]);
+                else addDynamicObject(new THREE.CylinderGeometry(0.4,0.4,1.2,10), pos, 1, cols[i]);
             }
-
-            document.getElementById('level-complete').style.display = 'none';
-            updateLevelUI();
         }
 
         // ─── UI ───────────────────────────────────────────────────
-        function updateLevelUI() {
-            const lv = levels[currentLevel - 1];
-            document.getElementById('level-number').textContent = currentLevel;
-            document.getElementById('objective').textContent = lv.description;
-            const progressBar = '█'.repeat(pickedUpCount) + '░'.repeat(lv.count - pickedUpCount);
-            document.getElementById('progress').textContent = `[${progressBar}] ${pickedUpCount}/${lv.count}`;
-            document.getElementById('current-level').textContent = currentLevel;
+        function updateHUD() {
+            document.getElementById('obj-count-hud').textContent = meshes.length;
+            document.getElementById('held-hud').textContent = heldObject ? 'YES' : '—';
             document.getElementById('debug-objects').textContent = meshes.length;
             document.getElementById('object-count').textContent = 'OBJECTS: ' + meshes.length;
-        }
-
-        function updateHUD() {
-            const elapsed = Math.floor((Date.now() - levelStartTime) / 1000);
-            document.getElementById('timer').textContent = elapsed + 's';
-            const ri = Math.min(Math.floor(totalScore / 500), ranks.length - 1);
-            document.getElementById('rank').textContent = ranks[ri];
-            document.getElementById('score').textContent = totalScore;
-
-            // debug
             document.getElementById('debug-state').textContent =
                 heldObject ? '⚔ HOLDING' : isLooking ? '◯ AIMING' : 'IDLE';
             if (heldObject) {
@@ -495,19 +450,25 @@
             }
         }
 
-        function completeLevel() {
-            const lv = levels[currentLevel - 1];
-            const t = Math.floor((Date.now() - levelStartTime) / 1000);
-            const bonus = Math.max(0, 300 - t * 10);
-            const s = lv.reward + bonus;
-            totalScore += s;
-
-            document.getElementById('completion-text').textContent =
-                currentLevel < 6 ? `⚡ LEVEL ${currentLevel} CLEARED ⚡` : '✦ GAME COMPLETE — YOU ARE LEGEND ✦';
-            document.getElementById('final-score').textContent = s;
-            document.getElementById('final-time').textContent = t + 's';
-            document.getElementById('next-level').style.display = currentLevel < 6 ? 'inline-block' : 'none';
-            document.getElementById('level-complete').style.display = 'block';
+        function burstSpawn() {
+            const count = 4 + Math.floor(Math.random() * 4);
+            const BURST_PALETTE = [0x00aaff, 0xff5555, 0x55ff88, 0xffaa00, 0xaa55ff, 0xff55bb, 0xff3300, 0x00ffcc];
+            for (let i = 0; i < count; i++) {
+                setTimeout(() => {
+                    if (meshes.length >= 18) return;
+                    const col = BURST_PALETTE[Math.floor(Math.random() * BURST_PALETTE.length)];
+                    const x = (Math.random() - 0.5) * 12;
+                    const z = -3 - Math.random() * 8;
+                    const y = 4 + Math.random() * 5;
+                    const pos = new THREE.Vector3(x, y, z);
+                    const mass = 0.5 + Math.random() * 2;
+                    const pick = Math.floor(Math.random() * 4);
+                    if (pick === 0) addDynamicObject(new THREE.BoxGeometry(0.6+Math.random()*0.8, 0.6+Math.random()*0.8, 0.6+Math.random()*0.8), pos, mass, col);
+                    else if (pick === 1) addDynamicObject(new THREE.SphereGeometry(0.3+Math.random()*0.5, 16, 16), pos, mass, col);
+                    else if (pick === 2) addDynamicObject(new THREE.CylinderGeometry(0.3, 0.3, 1+Math.random(), 10), pos, mass, col);
+                    else addDynamicObject(new THREE.ConeGeometry(0.35+Math.random()*0.3, 1+Math.random(), 10), pos, mass, col);
+                }, i * 180);
+            }
         }
 
         // ─── CONTROLS ────────────────────────────────────────────
@@ -515,8 +476,7 @@
         let moveForward = false, moveBackward = false, moveLeft = false, moveRight = false;
 
         document.addEventListener('click', () => {
-            if (!editorMode && document.getElementById('level-complete').style.display !== 'block')
-                if (!controls.isLocked) controls.lock();
+            if (!editorMode && !controls.isLocked) controls.lock();
         });
 
         document.addEventListener('keydown', e => {
@@ -561,7 +521,7 @@
         const SPRING_STIFFNESS = 160;   // Higher = snappier pull  (Portal is ~150-200)
         const SPRING_DAMPING   = 18;    // Higher = less oscillation
         const MAX_GRAB_RANGE   = 8.0;   // Max distance to grab from
-        const THROW_FORCE      = 22;    // m/s on release
+        let THROW_FORCE        = 22;    // m/s on release (overridden by slider)
 
         let heldObject    = null;   // { mesh, body, origMass, origLinearDamp, origAngularDamp }
         let holdDistance  = HOLD_DIST_DEFAULT;
@@ -646,14 +606,9 @@
             if (e.button !== 0) return;
             if (!controls.isLocked) { controls.lock(); return; }
             if (editorMode) return;
-            if (document.getElementById('level-complete').style.display === 'block') return;
 
             if (heldObject) {
-                // already holding — release + throw
                 releaseObject(true);
-                pickedUpCount++;
-                updateLevelUI();
-                if (pickedUpCount >= levels[currentLevel - 1].count) completeLevel();
                 return;
             }
 
@@ -665,19 +620,12 @@
             }
         });
 
-        // Mouse up: throw (if held via held-not-released pattern)
-        // Actually Portal uses toggle (click to grab, click again to throw).
-        // But we also support hold-and-release via mouseup for the level mechanic.
+        // Mouse up: throw on release
         document.addEventListener('mouseup', e => {
             if (e.button !== 0) return;
             if (!controls.isLocked) return;
             if (!heldObject) return;
-
-            // Throw on release
             releaseObject(true);
-            pickedUpCount++;
-            updateLevelUI();
-            if (pickedUpCount >= levels[currentLevel - 1].count) completeLevel();
         });
 
         // Scroll: adjust hold distance
@@ -701,16 +649,15 @@
             if (heldObject && heldObject.mesh === meshes[meshes.length - 1]) releaseObject(false);
             scene.remove(meshes.pop());
             world.removeBody(bodies.pop());
-            updateLevelUI();
         });
         document.getElementById('clear-all').addEventListener('click', () => {
             releaseObject(false);
             for (let i = meshes.length - 1; i >= 0; i--) {
                 scene.remove(meshes[i]); world.removeBody(bodies[i]);
             }
-            meshes.length = 0; bodies.length = 0; updateLevelUI();
+            meshes.length = 0; bodies.length = 0;
         });
-        document.getElementById('reset-level').addEventListener('click', () => loadLevel(currentLevel));
+        document.getElementById('reset-level').addEventListener('click', () => resetScene());
         document.getElementById('gravity-slider').addEventListener('input', e => {
             world.gravity.y = -parseFloat(e.target.value);
             document.getElementById('gravity-value').textContent = parseFloat(e.target.value).toFixed(1);
@@ -719,8 +666,6 @@
             currentMass = parseFloat(e.target.value);
             document.getElementById('mass-value').textContent = currentMass.toFixed(1);
         });
-        document.getElementById('next-level').addEventListener('click', () => loadLevel(currentLevel + 1));
-        document.getElementById('retry-level').addEventListener('click', () => loadLevel(currentLevel));
 
         // ─── ANIMATION LOOP ───────────────────────────────────────
         const clock = new THREE.Clock();
@@ -800,6 +745,9 @@
             }
 
             updateHUD();
+            // Bridge state to viewmodel
+            window._vmHeldObject = heldObject;
+            window._vmIsLooking  = isLooking;
             renderer.render(scene, camera);
         }
 
@@ -810,7 +758,618 @@
         });
 
         animate();
-        loadLevel(1);
+        resetScene();
+
+        // ─── AUTO-SPAWN ───────────────────────────────────────────
+        const AUTO_SPAWN_INTERVAL = 3500; // ms between spawns
+        const AUTO_SPAWN_MAX = 12;        // max auto-spawned objects at once
+        const SPAWN_SHAPES = ['box', 'sphere', 'cylinder', 'cone'];
+        const SPAWN_PALETTE = [0x00aaff, 0xff5555, 0x55ff88, 0xffaa00, 0xaa55ff, 0xff55bb, 0xffffff, 0xff3300];
+
+        function autoSpawn() {
+            if (meshes.length >= AUTO_SPAWN_MAX) return;
+            const shape = SPAWN_SHAPES[Math.floor(Math.random() * SPAWN_SHAPES.length)];
+            const col   = SPAWN_PALETTE[Math.floor(Math.random() * SPAWN_PALETTE.length)];
+            const x = (Math.random() - 0.5) * 14;
+            const z = -4 - Math.random() * 10;
+            const y = 3 + Math.random() * 4;
+            const pos = new THREE.Vector3(x, y, z);
+            const mass = 0.5 + Math.random() * 2;
+
+            if (shape === 'box') {
+                const s = 0.5 + Math.random() * 0.8;
+                addDynamicObject(new THREE.BoxGeometry(s, s, s), pos, mass, col);
+            } else if (shape === 'sphere') {
+                const r = 0.3 + Math.random() * 0.5;
+                addDynamicObject(new THREE.SphereGeometry(r, 16, 16), pos, mass, col);
+            } else if (shape === 'cylinder') {
+                addDynamicObject(new THREE.CylinderGeometry(0.3, 0.3, 1 + Math.random(), 10), pos, mass, col);
+            } else {
+                addDynamicObject(new THREE.ConeGeometry(0.4 + Math.random()*0.3, 1 + Math.random(), 10), pos, mass, col);
+            }
+        }
+
+        setInterval(autoSpawn, AUTO_SPAWN_INTERVAL);
+
+        // ─── ENHANCED EDITOR: new buttons & controls ────────────────
+        let currentSpawnColor = null; // null = auto palette
+        let currentThrowForce = 22;
+
+        // Color swatches
+        document.querySelectorAll('.color-swatch').forEach(sw => {
+            sw.addEventListener('click', () => {
+                document.querySelectorAll('.color-swatch').forEach(s => s.classList.remove('active'));
+                sw.classList.add('active');
+                currentSpawnColor = parseInt(sw.dataset.color.replace('#',''), 16);
+                document.getElementById('custom-color').value = sw.dataset.color;
+            });
+        });
+        document.getElementById('custom-color').addEventListener('input', e => {
+            document.querySelectorAll('.color-swatch').forEach(s => s.classList.remove('active'));
+            currentSpawnColor = parseInt(e.target.value.replace('#',''), 16);
+        });
+
+        // New shape buttons
+        document.getElementById('add-cone').addEventListener('click', () =>
+            addDynamicObject(new THREE.ConeGeometry(0.5, 1.5, 12), new THREE.Vector3(0,3,-3), currentMass, currentSpawnColor));
+        document.getElementById('add-torus').addEventListener('click', () =>
+            addDynamicObject(new THREE.TorusGeometry(0.5, 0.18, 16, 32), new THREE.Vector3(0,3,-3), currentMass, currentSpawnColor));
+
+        // Override existing add buttons to use color
+        document.getElementById('add-box').onclick = () =>
+            addDynamicObject(new THREE.BoxGeometry(1,1,1), new THREE.Vector3(0,3,-3), currentMass, currentSpawnColor);
+        document.getElementById('add-large-box').onclick = () =>
+            addDynamicObject(new THREE.BoxGeometry(2,2,2), new THREE.Vector3(0,4,-3), currentMass * 4, currentSpawnColor);
+        document.getElementById('add-sphere').onclick = () =>
+            addDynamicObject(new THREE.SphereGeometry(0.6, 32, 32), new THREE.Vector3(0,3,-3), currentMass, currentSpawnColor);
+        document.getElementById('add-cylinder').onclick = () =>
+            addDynamicObject(new THREE.CylinderGeometry(0.5,0.5,1.5,12), new THREE.Vector3(0,3,-3), currentMass, currentSpawnColor);
+
+        // Throw force slider
+        document.getElementById('throw-slider').addEventListener('input', e => {
+            currentThrowForce = parseFloat(e.target.value);
+            THROW_FORCE = currentThrowForce;
+            document.getElementById('throw-value').textContent = currentThrowForce;
+        });
+        // Bounciness slider
+        document.getElementById('bounce-slider').addEventListener('input', e => {
+            world.defaultContactMaterial.restitution = parseFloat(e.target.value);
+            document.getElementById('bounce-value').textContent = parseFloat(e.target.value).toFixed(2);
+        });
+
+        // Explode all
+        document.getElementById('explode-all').addEventListener('click', () => {
+            bodies.forEach(b => {
+                const force = new CANNON.Vec3(
+                    (Math.random()-0.5)*800,
+                    Math.random()*600 + 200,
+                    (Math.random()-0.5)*800
+                );
+                b.applyImpulse(force);
+            });
+        });
+
+        // Gun skins
+        document.querySelectorAll('.gun-skin-btn').forEach(btn => {
+            btn.addEventListener('click', () => {
+                document.querySelectorAll('.gun-skin-btn').forEach(b => b.classList.remove('active'));
+                btn.classList.add('active');
+                viewmodelSetSkin(btn.dataset.skin);
+            });
+        });
+        document.querySelector('.gun-skin-btn[data-skin="default"]').classList.add('active');
+
+    </script>
+
+    <!-- ─── 3D HAND + GUN VIEWMODEL ─── -->
+    <script type="module">
+        import * as THREE from 'three';
+
+        const canvas = document.getElementById('viewmodel-canvas');
+        const W = 520, H = 380;
+        canvas.width  = W * window.devicePixelRatio;
+        canvas.height = H * window.devicePixelRatio;
+        canvas.style.width  = W + 'px';
+        canvas.style.height = H + 'px';
+
+        const renderer = new THREE.WebGLRenderer({ canvas, alpha: true, antialias: true });
+        renderer.setSize(W, H);
+        renderer.setPixelRatio(window.devicePixelRatio);
+        renderer.setClearColor(0x000000, 0);
+        renderer.shadowMap.enabled = true;
+        renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+
+        const scene = new THREE.Scene();
+        const camera = new THREE.PerspectiveCamera(55, W / H, 0.01, 50);
+        camera.position.set(0, 0, 0);
+
+        // ── LIGHTS ──────────────────────────────────────
+        const ambient = new THREE.AmbientLight(0x334455, 1.8);
+        scene.add(ambient);
+        const keyLight = new THREE.DirectionalLight(0xffffff, 3.5);
+        keyLight.position.set(-2, 4, 3);
+        keyLight.castShadow = true;
+        scene.add(keyLight);
+        const rimLight = new THREE.DirectionalLight(0x00ffcc, 1.2);
+        rimLight.position.set(3, 1, -3);
+        scene.add(rimLight);
+        const fillLight = new THREE.PointLight(0xff6600, 0.6, 10);
+        fillLight.position.set(0.5, -0.5, 1.5);
+        scene.add(fillLight);
+
+        // ── MATERIALS ───────────────────────────────────
+        const skinMats = {
+            default: {
+                gun:    new THREE.MeshStandardMaterial({ color:0x111111, roughness:0.25, metalness:0.95 }),
+                barrel: new THREE.MeshStandardMaterial({ color:0x0a0a0a, roughness:0.15, metalness:1.0  }),
+                accent: new THREE.MeshStandardMaterial({ color:0x333333, roughness:0.4,  metalness:0.7  }),
+                grip:   new THREE.MeshStandardMaterial({ color:0x1a0f0a, roughness:0.9,  metalness:0.0  }),
+                slide:  new THREE.MeshStandardMaterial({ color:0x181818, roughness:0.2,  metalness:0.95 }),
+            },
+            gold: {
+                gun:    new THREE.MeshStandardMaterial({ color:0xffcc00, roughness:0.1,  metalness:1.0  }),
+                barrel: new THREE.MeshStandardMaterial({ color:0xcc9900, roughness:0.08, metalness:1.0  }),
+                accent: new THREE.MeshStandardMaterial({ color:0xffe066, roughness:0.15, metalness:0.9  }),
+                grip:   new THREE.MeshStandardMaterial({ color:0x3d2200, roughness:0.8,  metalness:0.1  }),
+                slide:  new THREE.MeshStandardMaterial({ color:0xddaa00, roughness:0.12, metalness:1.0  }),
+            },
+            chrome: {
+                gun:    new THREE.MeshStandardMaterial({ color:0xcccccc, roughness:0.05, metalness:1.0  }),
+                barrel: new THREE.MeshStandardMaterial({ color:0xaaaaaa, roughness:0.04, metalness:1.0  }),
+                accent: new THREE.MeshStandardMaterial({ color:0xeeeeee, roughness:0.08, metalness:1.0  }),
+                grip:   new THREE.MeshStandardMaterial({ color:0x222222, roughness:0.85, metalness:0.0  }),
+                slide:  new THREE.MeshStandardMaterial({ color:0xdddddd, roughness:0.06, metalness:1.0  }),
+            },
+            red: {
+                gun:    new THREE.MeshStandardMaterial({ color:0xcc0000, roughness:0.2,  metalness:0.85 }),
+                barrel: new THREE.MeshStandardMaterial({ color:0x880000, roughness:0.15, metalness:0.9  }),
+                accent: new THREE.MeshStandardMaterial({ color:0xff3333, roughness:0.3,  metalness:0.6  }),
+                grip:   new THREE.MeshStandardMaterial({ color:0x1a0000, roughness:0.9,  metalness:0.0  }),
+                slide:  new THREE.MeshStandardMaterial({ color:0xaa0000, roughness:0.18, metalness:0.88 }),
+            }
+        };
+        let currentSkin = 'default';
+
+        const handMat = new THREE.MeshStandardMaterial({ color:0xc68642, roughness:0.75, metalness:0.0 });
+        const handDarkMat = new THREE.MeshStandardMaterial({ color:0xa0622a, roughness:0.8, metalness:0.0 });
+        const nailMat = new THREE.MeshStandardMaterial({ color:0xf0b090, roughness:0.6, metalness:0.05 });
+        const gloveSeamMat = new THREE.MeshStandardMaterial({ color:0x1a1a1a, roughness:0.95, metalness:0.0 });
+
+        // ── GUN GROUP ───────────────────────────────────
+        const gunGroup = new THREE.Group();
+        scene.add(gunGroup);
+
+        // Helper: rounded box approximation using a box
+        function box(w,h,d,mat,x,y,z,rx=0,ry=0,rz=0) {
+            const m = new THREE.Mesh(new THREE.BoxGeometry(w,h,d), mat);
+            m.position.set(x,y,z);
+            m.rotation.set(rx,ry,rz);
+            m.castShadow = true;
+            return m;
+        }
+        function cyl(rt,rb,h,segs,mat,x,y,z,rx=0,ry=0,rz=0) {
+            const m = new THREE.Mesh(new THREE.CylinderGeometry(rt,rb,h,segs), mat);
+            m.position.set(x,y,z);
+            m.rotation.set(rx,ry,rz);
+            m.castShadow = true;
+            return m;
+        }
+
+        // Gun parts — all parented to gunGroup
+        const S = skinMats.default;
+
+        // SLIDE (top of gun, reciprocating part)
+        const slide = new THREE.Group();
+        slide.add(box(0.13, 0.09, 0.50, S.slide, 0, 0, 0));           // main slide body
+        slide.add(box(0.13, 0.02, 0.50, S.accent, 0, -0.055, 0));     // bottom rail
+        slide.add(box(0.02, 0.045, 0.08, S.accent, 0.075, 0.02, -0.18)); // ejection port ridge R
+        slide.add(box(0.02, 0.045, 0.08, S.accent, -0.075, 0.02, -0.18)); // L
+        // Serrations (rear slide serrations)
+        for(let i=0;i<5;i++){
+            slide.add(box(0.135, 0.01, 0.008, S.gun, 0, 0.05, -0.16+i*0.018));
+        }
+        // Front sight
+        slide.add(box(0.015, 0.025, 0.01, S.accent, 0, 0.065, 0.22));
+        // Rear sight
+        slide.add(box(0.06, 0.02, 0.01, S.accent, 0, 0.06, -0.23));
+        slide.position.set(0, 0.045, 0);
+        gunGroup.add(slide);
+
+        // FRAME (lower receiver)
+        const frame = new THREE.Group();
+        frame.add(box(0.12, 0.065, 0.46, S.gun, 0, 0, 0));            // main frame
+        frame.add(box(0.12, 0.02, 0.46, S.accent, 0, -0.042, 0));     // dust cover / lower rail
+        // Trigger guard
+        const tgCurve = new THREE.QuadraticBezierCurve3(
+            new THREE.Vector3(-0.05,-0.032,0.08),
+            new THREE.Vector3(-0.05,-0.065,0.03),
+            new THREE.Vector3(-0.05,-0.032,-0.08)
+        );
+        // Approximate trigger guard as thin box
+        frame.add(box(0.01, 0.01, 0.18, S.gun, 0, -0.06, 0.0));
+        frame.add(box(0.01, 0.04, 0.01, S.gun, 0, -0.045, 0.09));
+        frame.add(box(0.01, 0.04, 0.01, S.gun, 0, -0.045, -0.09));
+
+        // Trigger
+        const trigger = new THREE.Mesh(new THREE.BoxGeometry(0.008, 0.03, 0.015), S.accent);
+        trigger.position.set(0, -0.055, 0.04);
+        trigger.rotation.x = 0.3;
+        frame.add(trigger);
+        frame.position.set(0, 0, 0);
+        gunGroup.add(frame);
+
+        // GRIP
+        const grip = new THREE.Group();
+        grip.add(box(0.11, 0.18, 0.11, S.grip, 0, 0, 0));       // main grip block
+        // Grip texture panels
+        for(let i=0;i<6;i++){
+            grip.add(box(0.113, 0.005, 0.10, gloveSeamMat, 0, -0.06+i*0.022, 0));
+        }
+        grip.add(box(0.015, 0.18, 0.113, gloveSeamMat, 0.057, 0, 0));  // side panel seam
+        grip.add(box(0.015, 0.18, 0.113, gloveSeamMat, -0.057, 0, 0)); // side panel seam
+        grip.position.set(0, -0.145, -0.07);
+        grip.rotation.x = 0.12;
+        gunGroup.add(grip);
+
+        // BARREL
+        const barrelGroup = new THREE.Group();
+        barrelGroup.add(cyl(0.028, 0.028, 0.55, 16, S.barrel, 0, 0, 0, 0,0,0));  // outer barrel
+        barrelGroup.add(cyl(0.014, 0.014, 0.58, 12, S.accent, 0, 0, 0, 0,0,0));  // bore (dark inner)
+        // Muzzle device
+        barrelGroup.add(cyl(0.036, 0.036, 0.04, 8, S.slide, 0, 0.28, 0, 0,0,0));
+        for(let i=0;i<6;i++){
+            const a = (i/6)*Math.PI*2;
+            barrelGroup.add(cyl(0.005, 0.005, 0.04, 6, S.accent,
+                Math.cos(a)*0.03, 0.28, Math.sin(a)*0.03));
+        }
+        barrelGroup.rotation.x = Math.PI/2;
+        barrelGroup.position.set(0, 0.04, 0.28);
+        gunGroup.add(barrelGroup);
+
+        // MAGAZINE baseplate
+        const mag = new THREE.Group();
+        mag.add(box(0.095, 0.015, 0.088, S.accent, 0, 0, 0));
+        mag.position.set(0, -0.232, -0.07);
+        gunGroup.add(mag);
+
+        // Hammer
+        const hammer = new THREE.Mesh(new THREE.BoxGeometry(0.02, 0.03, 0.015), S.slide);
+        hammer.position.set(0, 0.04, -0.255);
+        hammer.rotation.x = -0.4;
+        gunGroup.add(hammer);
+
+        // Rail under barrel (tactical rail)
+        const rail = new THREE.Group();
+        rail.add(box(0.11, 0.018, 0.22, S.gun, 0, 0, 0));
+        for(let i=0;i<5;i++) rail.add(box(0.112, 0.005, 0.005, S.accent, 0, 0, -0.09+i*0.044));
+        rail.position.set(0, -0.005, 0.16);
+        gunGroup.add(rail);
+
+        // ── HAND GROUP ──────────────────────────────────
+        const handGroup = new THREE.Group();
+        scene.add(handGroup);
+
+        // Palm
+        const palm = new THREE.Mesh(new THREE.BoxGeometry(0.17, 0.06, 0.19), handMat);
+        palm.castShadow = true;
+        handGroup.add(palm);
+
+        // Wrist
+        const wrist = new THREE.Mesh(new THREE.CylinderGeometry(0.07, 0.09, 0.12, 12), handMat);
+        wrist.position.set(0, 0, 0.14);
+        wrist.rotation.x = Math.PI/2;
+        handGroup.add(wrist);
+
+        // Forearm (lower arm going off-screen)
+        const forearm = new THREE.Mesh(new THREE.CylinderGeometry(0.09, 0.11, 0.6, 12), handMat);
+        forearm.position.set(0, 0, 0.42);
+        forearm.rotation.x = Math.PI/2;
+        handGroup.add(forearm);
+
+        // Sleeve cuff
+        const sleeve = new THREE.Mesh(new THREE.CylinderGeometry(0.11, 0.115, 0.08, 12),
+            new THREE.MeshStandardMaterial({ color:0x111111, roughness:0.9, metalness:0.05 }));
+        sleeve.position.set(0, 0, 0.62);
+        sleeve.rotation.x = Math.PI/2;
+        handGroup.add(sleeve);
+
+        // Fingers: [index, middle, ring, pinky] gripping the gun
+        function makeSegment(len, w, mat) {
+            const m = new THREE.Mesh(new THREE.BoxGeometry(w, w, len), mat);
+            m.castShadow = true;
+            return m;
+        }
+
+        function makeFinger(baseX, baseY, baseZ, segLens, curls, mat) {
+            const g = new THREE.Group();
+            handGroup.add(g);
+            g.position.set(baseX, baseY, baseZ);
+
+            let current = g;
+            segLens.forEach((len, i) => {
+                const pivot = new THREE.Group();
+                pivot.position.set(0, 0, -len * 0.5);
+                const seg = makeSegment(len, 0.025, mat);
+                seg.position.set(0, 0, 0);
+                pivot.add(seg);
+
+                // Knuckle ridge
+                const knuckle = new THREE.Mesh(
+                    new THREE.SphereGeometry(0.014, 8, 8), mat);
+                knuckle.position.set(0, 0, -len * 0.5);
+                pivot.add(knuckle);
+
+                // Nail on last segment
+                if(i === segLens.length - 1) {
+                    const nail = new THREE.Mesh(new THREE.BoxGeometry(0.02, 0.006, 0.018), nailMat);
+                    nail.position.set(0, 0.016, -0.008);
+                    pivot.add(nail);
+                }
+
+                current.add(pivot);
+                pivot.rotation.x = curls[i] || 0;
+                current = pivot;
+            });
+            return g;
+        }
+
+        // Grip fingers (curled around grip) — positioned on sides of grip
+        // Index finger — partially extended, resting near trigger guard
+        makeFinger(0.09, 0.01, -0.11, [0.04, 0.035, 0.028], [0.4, 0.8, 0.7], handMat);
+        makeFinger(-0.09, 0.01, -0.11, [0.04, 0.035, 0.028], [0.4, 0.8, 0.7], handMat);
+
+        // Middle finger
+        makeFinger(0.09, 0.01, -0.06, [0.045, 0.038, 0.030], [1.4, 1.3, 1.1], handMat);
+        makeFinger(-0.09, 0.01, -0.06, [0.045, 0.038, 0.030], [1.4, 1.3, 1.1], handMat);
+
+        // Ring finger
+        makeFinger(0.09, 0.01, -0.01, [0.04, 0.034, 0.026], [1.5, 1.3, 1.0], handMat);
+        makeFinger(-0.09, 0.01, -0.01, [0.04, 0.034, 0.026], [1.5, 1.3, 1.0], handMat);
+
+        // Pinky
+        makeFinger(0.09, 0.01, 0.04, [0.032, 0.026, 0.020], [1.4, 1.2, 0.9], handMat);
+        makeFinger(-0.09, 0.01, 0.04, [0.032, 0.026, 0.020], [1.4, 1.2, 0.9], handMat);
+
+        // Thumb — wrapped around left side of grip
+        const thumbG = new THREE.Group();
+        thumbG.position.set(0.095, 0.01, -0.06);
+        handGroup.add(thumbG);
+        const thumbSeg1 = new THREE.Group();
+        thumbSeg1.rotation.z = -0.5;
+        thumbSeg1.rotation.x = -0.3;
+        const ts1 = makeSegment(0.045, 0.030, handMat);
+        ts1.position.set(0.02, 0, 0);
+        thumbSeg1.add(ts1);
+        const thumbSeg2 = new THREE.Group();
+        thumbSeg2.position.set(0.04, 0, 0);
+        thumbSeg2.rotation.z = -0.4;
+        const ts2 = makeSegment(0.038, 0.026, handMat);
+        ts2.position.set(0.018, 0, 0);
+        thumbSeg2.add(ts2);
+        const tnail = new THREE.Mesh(new THREE.BoxGeometry(0.006, 0.018, 0.018), nailMat);
+        tnail.position.set(0.033, 0.012, 0);
+        thumbSeg2.add(tnail);
+        thumbSeg1.add(thumbSeg2);
+        thumbG.add(thumbSeg1);
+
+        // Position entire viewmodel in view-space
+        // The gun sits bottom-right, hand wraps grip
+        const VM_POS = new THREE.Vector3(0.28, -0.26, -0.75);
+        const VM_ROT = new THREE.Euler(-0.08, -0.18, 0.04);
+
+        gunGroup.position.copy(VM_POS);
+        gunGroup.rotation.copy(VM_ROT);
+
+        handGroup.position.set(VM_POS.x - 0.0, VM_POS.y - 0.06, VM_POS.z + 0.05);
+        handGroup.rotation.copy(VM_ROT);
+
+        // ── MUZZLE FLASH ────────────────────────────────
+        const flashLight = new THREE.PointLight(0xff8800, 0, 3);
+        flashLight.position.set(0.28, -0.22, -1.05);
+        scene.add(flashLight);
+        const flashSprite = new THREE.Mesh(
+            new THREE.PlaneGeometry(0.1, 0.1),
+            new THREE.MeshBasicMaterial({ color:0xffcc44, transparent:true, opacity:0, side:THREE.DoubleSide })
+        );
+        flashSprite.position.set(0.28, -0.22, -1.02);
+        scene.add(flashSprite);
+
+        // ── BRASS EJECTION PARTICLES ─────────────────────
+        const shellGeo = new THREE.CylinderGeometry(0.004, 0.004, 0.016, 6);
+        const shellMat = new THREE.MeshStandardMaterial({ color:0xcc8800, roughness:0.3, metalness:0.9 });
+        const shells = [];
+        function spawnShell() {
+            const s = new THREE.Mesh(shellGeo, shellMat);
+            s.position.set(0.18, -0.19, -0.72);
+            s.velocity = new THREE.Vector3(
+                0.8 + Math.random()*0.4,
+                0.5 + Math.random()*0.5,
+                -(Math.random()*0.3)
+            );
+            s.angularV = new THREE.Vector3(
+                (Math.random()-0.5)*20,
+                (Math.random()-0.5)*20,
+                (Math.random()-0.5)*20
+            );
+            s.life = 1.0;
+            scene.add(s);
+            shells.push(s);
+        }
+
+        // ── SKIN SWITCHER ────────────────────────────────
+        window.viewmodelSetSkin = (name) => {
+            currentSkin = name;
+            const S2 = skinMats[name] || skinMats.default;
+            // Update gun part materials
+            gunGroup.traverse(child => {
+                if(!child.isMesh) return;
+                // Only replace gun metal parts, not grip
+                const m = child.material;
+                if(m === skinMats.default.slide || m === skinMats.gold.slide || m === skinMats.chrome.slide || m === skinMats.red.slide) child.material = S2.slide;
+                else if(m === skinMats.default.gun || m === skinMats.gold.gun || m === skinMats.chrome.gun || m === skinMats.red.gun) child.material = S2.gun;
+                else if(m === skinMats.default.barrel || m === skinMats.gold.barrel || m === skinMats.chrome.barrel || m === skinMats.red.barrel) child.material = S2.barrel;
+                else if(m === skinMats.default.accent || m === skinMats.gold.accent || m === skinMats.chrome.accent || m === skinMats.red.accent) child.material = S2.accent;
+                else if(m === skinMats.default.grip || m === skinMats.gold.grip || m === skinMats.chrome.grip || m === skinMats.red.grip) child.material = S2.grip;
+            });
+        };
+
+        // ── ANIMATION STATE ──────────────────────────────
+        let isAiming = false;
+        let isHolding = false;
+        let isFiring = false;
+        let fireRecoil = 0;
+        let recoilReturn = 0;
+        let idleT = 0;
+        let walkT = 0;
+        let lastFireTime = 0;
+
+        // Slide reciprocation
+        let slideRecoil = 0;
+
+        // Bob / idle / walk
+        const idleBob  = { x:0, y:0 };
+        const walkBob  = { x:0, y:0 };
+        const aimLerp  = { v:0 };
+        const holdLerp = { v:0 };
+
+        // ── FIRE TRIGGER ─────────────────────────────────
+        // Listen for clicks on main page
+        document.addEventListener('mousedown', (e) => {
+            if(e.button !== 0) return;
+            // Fire only when pointer is locked (in game)
+            if(document.pointerLockElement) {
+                triggerFire();
+            }
+        });
+        document.addEventListener('mouseup', () => {
+            // second click throws — also fire
+        });
+
+        function triggerFire() {
+            const now = Date.now();
+            if(now - lastFireTime < 120) return; // ROF limit
+            lastFireTime = now;
+            isFiring = true;
+            fireRecoil = 1.0;
+            slideRecoil = 1.0;
+            spawnShell();
+            // Flash
+            flashLight.intensity = 8;
+            flashSprite.material.opacity = 0.9;
+            setTimeout(() => {
+                flashLight.intensity = 0;
+                flashSprite.material.opacity = 0;
+            }, 55);
+        }
+
+        const clock2 = new THREE.Clock();
+
+        function vmAnimate() {
+            requestAnimationFrame(vmAnimate);
+            const dt = Math.min(clock2.getDelta(), 0.05);
+            idleT += dt;
+            walkT += dt * 2.5;
+
+            // Detect state from main page globals
+            const mainHeld = !!window._vmHeldObject;
+            const mainAim  = !!window._vmIsLooking;
+            aimLerp.v  += (mainAim  ? 1 : 0 - aimLerp.v)  * dt * 8;
+            holdLerp.v += (mainHeld ? 1 : 0 - holdLerp.v) * dt * 6;
+
+            // Idle sway
+            const idleSwayX = Math.sin(idleT * 0.7)  * 0.003;
+            const idleSwayY = Math.sin(idleT * 0.5)  * 0.002;
+            const idleSwayZ = Math.sin(idleT * 0.35) * 0.001;
+
+            // Walk bob (simulate from elapsed time as proxy)
+            const walkBobX = Math.sin(walkT) * 0.006;
+            const walkBobY = Math.abs(Math.sin(walkT)) * 0.004;
+
+            // Recoil decay
+            fireRecoil  *= Math.pow(0.02, dt);
+            slideRecoil *= Math.pow(0.04, dt);
+            if(fireRecoil < 0.001) { fireRecoil = 0; isFiring = false; }
+
+            // Aim-in: bring gun up/left and in-z
+            const aimX =  aimLerp.v * -0.22;
+            const aimY =  aimLerp.v *  0.19;
+            const aimZ =  aimLerp.v *  0.20;
+
+            // Hold tilt: tip barrel up slightly when holding
+            const holdTilt = holdLerp.v * 0.08;
+
+            // Apply to gun group
+            const baseX = VM_POS.x + idleSwayX + walkBobX + aimX;
+            const baseY = VM_POS.y + idleSwayY + walkBobY + aimY;
+            const baseZ = VM_POS.z + idleSwayZ + aimZ;
+
+            gunGroup.position.set(
+                baseX - fireRecoil * 0.015,
+                baseY + fireRecoil * 0.02,
+                baseZ + fireRecoil * 0.08
+            );
+            gunGroup.rotation.set(
+                VM_ROT.x - fireRecoil * 0.18 - holdTilt,
+                VM_ROT.y + idleSwayX * 2,
+                VM_ROT.z + idleSwayY * 1.5
+            );
+
+            handGroup.position.set(
+                baseX - 0.0  - fireRecoil * 0.012,
+                baseY - 0.06 + fireRecoil * 0.015,
+                baseZ + 0.05 + fireRecoil * 0.06
+            );
+            handGroup.rotation.set(
+                VM_ROT.x - fireRecoil * 0.15 - holdTilt,
+                VM_ROT.y + idleSwayX * 2,
+                VM_ROT.z + idleSwayY * 1.5
+            );
+
+            // Slide reciprocation (eject on fire)
+            slide.position.z = -slideRecoil * 0.06;
+
+            // Update shells
+            for(let i = shells.length - 1; i >= 0; i--) {
+                const s = shells[i];
+                s.life -= dt * 1.2;
+                s.position.addScaledVector(s.velocity, dt);
+                s.velocity.y -= 1.5 * dt;
+                s.rotation.x += s.angularV.x * dt;
+                s.rotation.y += s.angularV.y * dt;
+                s.rotation.z += s.angularV.z * dt;
+                s.material.opacity = s.life;
+                if(s.life <= 0) {
+                    scene.remove(s);
+                    shells.splice(i, 1);
+                }
+            }
+
+            // Emissive pulse on hold
+            if(holdLerp.v > 0.1) {
+                const pulse = 0.3 + Math.sin(Date.now()*0.006)*0.15;
+                rimLight.color.setHex(0xff00ff);
+                rimLight.intensity = 1.2 + pulse;
+            } else {
+                rimLight.color.setHex(0x00ffcc);
+                rimLight.intensity = 1.2;
+            }
+
+            renderer.render(scene, camera);
+        }
+        vmAnimate();
+
+        // Expose state bridge for viewmodel to read from main game
+        setInterval(() => {
+            // Peek at global game state via window (set below)
+        }, 16);
+    </script>
+
+    <script type="module">
+        // Bridge: expose heldObject and isLooking to viewmodel
+        // We poll the module scope via a shared namespace trick
+        // The main game script exposes these after animate() via window
+        const orig = window.requestAnimationFrame;
+        // Just bridge after a tick
     </script>
 </body>
 </html>
